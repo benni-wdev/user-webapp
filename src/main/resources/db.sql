@@ -1,0 +1,20 @@
+create table APP.USR_USER (
+UUID varchar(36) not null,
+ ACTIVATION_STATUS varchar(36),
+ACTIVATION_STATUS_CHANGED_AT datetime(6),
+ACTIVATION_TOKEN varchar(40),
+ACTIVATION_TOKEN_EXPIRES_AT datetime(6),
+CREATED_AT datetime(6),
+EMAIL_ADDRESS varchar(255),
+EMAIL_CHANGED_AT datetime(6),
+FAILED_LOGINS integer,
+LAST_LOGGED_IN_AT datetime(6),
+LOGIN_ID varchar(255),
+PASSWORD_CHANGED_AT datetime(6),
+PASSWORD_HASH varchar(255),
+PASSWORD_RECOVERY_TOKEN varchar(40),
+PASSW_RECOVERY_TOKEN_EXPIRES_AT datetime(6),
+REFRESH_TOKEN varchar(40),
+VERSION integer,
+primary key (UUID)
+) engine=InnoDB;

@@ -19,4 +19,4 @@
         <li>smtpPort: for the smtp host login</li>
         <li>or set isMailingEnabled to false</li>
     </ul>
-    <p>I ran it on a tomcat with a mysql database, the table definition which is necessary is stored in db.sql.</p>
+    <p>Udpate will com soon</p>

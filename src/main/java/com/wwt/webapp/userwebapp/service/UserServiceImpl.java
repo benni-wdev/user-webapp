@@ -1,167 +1,179 @@
 package com.wwt.webapp.userwebapp.service;
 
-import com.wwt.webapp.userwebapp.domain.*;
-import com.wwt.webapp.userwebapp.domain.request.ArchiveRequest;
-import com.wwt.webapp.userwebapp.domain.request.AuthenticatedRequest;
-import com.wwt.webapp.userwebapp.domain.request.EmailChangeRequest;
-import com.wwt.webapp.userwebapp.domain.request.PasswordChangeRequest;
-import com.wwt.webapp.userwebapp.domain.response.BasicResponse;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
-import com.wwt.webapp.userwebapp.domain.response.MessageCode;
+import com.wwt.webapp.userwebapp.domain.ActivationStatus;
+import com.wwt.webapp.userwebapp.domain.AdminRole;
+import com.wwt.webapp.userwebapp.domain.relational.UserRepository;
+import com.wwt.webapp.userwebapp.domain.relational.entity.UserEntity;
 import com.wwt.webapp.userwebapp.mail.EmailType;
+import com.wwt.webapp.userwebapp.mail.MailProcessor;
 import com.wwt.webapp.userwebapp.security.PasswordHash;
-import com.wwt.webapp.userwebapp.util.EntityManagerUtil;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import com.wwt.webapp.userwebapp.service.response.BasicResponse;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
+import com.wwt.webapp.userwebapp.service.response.UserResponse;
+import com.wwt.webapp.userwebapp.service.response.UserResponseList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
+import java.util.Optional;
 
 
 /**
- * @author benw-at-wwt
+ *
  */
-@SuppressWarnings("JavaDoc")
-public class UserServiceImpl extends AuthenticatedService implements UserService {
+@Service
+public class UserServiceImpl extends BaseUserService implements UserService {
 
 
-    private static final Logger logger = Logger.getLogger(UserServiceImpl.class);
+    private final static Logger logger = LoggerFactory.getLogger( UserServiceImpl.class);
 
+    @Autowired
+    private UserRepository userRepository;
 
+    @Autowired
+    private MailProcessor mailProcessor;
+
+    /**
+     * ADMIN Method
+     */
     @Override
-    public InternalResponse readUser(AuthenticatedRequest request) {
-        InternalResponse returnValue = isAuthenticated(request);
-        if(returnValue.isSuccessful()) {
-            String authenticatedUuid = ((AuthenticatedResponse) returnValue).getAuthenticatedUuid();
-            em = EntityManagerUtil.getEntityManager();
-            em.getTransaction().begin();
-            List<UserDto> userDtos = em.createQuery("select new com.wwt.webapp.userwebapp.domain.UserDto( u.uuid,u.createdAt,u.version," +
-                    "u.loginId,u.emailAddress,u.emailChangedAt,u.passwordChangedAt,u.activationStatus,u.activationStatusChangedAt,"+
-                    "u.lastLoggedInAt) from UserEntity u where u.uuid = :uuid",UserDto.class)
-                    .setParameter("uuid",authenticatedUuid)
-                    .getResultList();
-            if (userDtos.size() == 1) {
-                logger.info("readUser: user returned");
-                returnValue = userDtos.get(0).convert();
-            }
-            else {
-                returnValue = createLoginOrPasswordWrong(logger, "readUser: Not exactly one user found: " + request.getIdToken());
-            }
-            handleTransaction(returnValue);
-
-        }
-        return returnValue;
-    }
-
-    @Override
-    public InternalResponse changePassword(PasswordChangeRequest passwordChangeReq) {
-        InternalResponse returnValue = isAuthenticated(passwordChangeReq);
-        if(returnValue.isSuccessful()) {
-            String authenticatedUuid = ((AuthenticatedResponse) returnValue).getAuthenticatedUuid();
-            em = EntityManagerUtil.getEntityManager();
-            em.getTransaction().begin();
-            List<UserEntity> userEntities = getUserEntityWithUuid(authenticatedUuid);
-            if (userEntities.size() == 1) {
-                UserEntity user = userEntities.get(0);
-                if (PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(passwordChangeReq.getOldPassword())) {
-                    user.setPasswordHash(PasswordHash.newInstance(passwordChangeReq.getNewPassword()).getPasswordHash());
-                    logger.log(Level.OFF, "changePassword: Password changed" + user.getUuid());
-                    returnValue = createOperationSuccessfulResponse();
-                }
-                else {
-                    logger.info("changePassword: current password wrong");
-                    returnValue = new BasicResponse(false, MessageCode.LOGIN_OR_PASSWORD_WRONG);
-                }
-            }
-            else {
-                returnValue = createLoginOrPasswordWrong(logger, "changePassword: Not exactly one user found: " + passwordChangeReq.getIdToken());
-            }
-            handleTransaction(returnValue);
-        }
-        return returnValue;
-    }
-
-    @Override
-    public InternalResponse changeEmail(EmailChangeRequest emailChangeReq) {
-        InternalResponse returnValue = isAuthenticated(emailChangeReq);
-        if(returnValue.isSuccessful()) {
-            if (isValidEmailAddress(emailChangeReq.getEmail())) {
-                String authenticatedUuid = ((AuthenticatedResponse) returnValue).getAuthenticatedUuid();
-                em = EntityManagerUtil.getEntityManager();
-                em.getTransaction().begin();
-                List<UserEntity> userEntities = getUserEntityWithUuid(authenticatedUuid);
-                if (userEntities.size() == 1) {
-                    UserEntity user = userEntities.get(0);
-                    if (!user.getEmailAddress().equals(emailChangeReq.getEmail())) {
-                        if (isEmailUnique(emailChangeReq.getEmail(), em)) {
-                            user.setEmailAddress(emailChangeReq.getEmail());
-                            user.setActivationStatus( ActivationStatus.ESTABLISHED);
-                            //for changing the email re-activation in necessary
-                            UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
-                            user.setActivationToken(userStatusChangeToken);
-                            if (mailProcessor.isSendMailSuccessful(EmailType.ACTIVATION_MAIL, user.getEmailAddress(), userStatusChangeToken.getToken())) {
-                                logger.log(Level.OFF, "changeEmail: email changed" + user.getUuid());
-                                returnValue = createOperationSuccessfulResponse();
-                            }
-                            else {
-                                logger.error("changeEmail: send email failed " + user.getUuid());
-                                returnValue = new BasicResponse(false, MessageCode.UNEXPECTED_ERROR);
-                            }
-
-                        }
-                        else {
-                            logger.warn("changeEmail: email address already used " + emailChangeReq.getEmail());
-                            returnValue = new BasicResponse(false, MessageCode.EMAIL_ADDRESS_ALREADY_EXISTS);
-                        }
-                    }
-                    else {
-                        logger.debug("changeEmail: email address not changed " + emailChangeReq.getEmail());
-                        returnValue = new BasicResponse(false, MessageCode.NO_CHANGE_NO_UPDATE);
-                    }
-                } else {
-                    returnValue = createLoginOrPasswordWrong(logger, "changeEmail: Not exactly one user found: " + emailChangeReq.getIdToken());
-                }
-                handleTransaction(returnValue);
-            }
-            else {
-                logger.info("changeEmail: email not valid " + emailChangeReq.getEmail());
-                returnValue = new BasicResponse(false, MessageCode.EMAIL_ADDRESS_NOT_VALID);
-            }
-        }
-        return returnValue;
+    @Transactional
+    public InternalResponse readAllUsers() {
+        List<UserEntity> users = userRepository.findAll();
+        logger.info("readAllUsers: user returned");
+        return UserResponseList.convertToUserResponseList(users);
     }
 
 
     @Override
-    public InternalResponse archiveUser(ArchiveRequest archiveRequestRequest) {
-        InternalResponse returnValue = isAuthenticated(archiveRequestRequest);
-        if(returnValue.isSuccessful()) {
-            String authenticatedUuid = ((AuthenticatedResponse) returnValue).getAuthenticatedUuid();
-            em = EntityManagerUtil.getEntityManager();
-            em.getTransaction().begin();
-            List<UserEntity> userEntities = getUserEntityWithUuid(authenticatedUuid);
-            if (userEntities.size() == 1) {
-                UserEntity user = userEntities.get(0);
-                if (user.getActivationStatus().equals(ActivationStatus.ACTIVE)) {
-                    if (PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(archiveRequestRequest.getPassword())) {
-                        logger.log(Level.OFF, "archiveUser: user archived " + user.getUuid());
-                        user.setActivationStatus(ActivationStatus.ARCHIVED);
-                        returnValue = createOperationSuccessfulResponse();
-                    }
-                    else {
-                        returnValue = createLoginOrPasswordWrong(logger, "archiveUser: user password check failed  " + user.getUuid());
-                    }
-                }
-                else {
-                    logger.warn("archiveUser: user not active " + user.getUuid());
-                    returnValue = new BasicResponse(false, MessageCode.USER_NOT_ACTIVE);
-                }
-            }
-            else {
-                returnValue = createLoginOrPasswordWrong(logger, "archiveUser: Not exactly one user found: " + archiveRequestRequest.getIdToken());
-            }
-            handleTransaction(returnValue);
+    @Transactional
+    public InternalResponse readUser(String userUuid) {
+        if(userUuid == null) {
+            logger.error("readUser: userUuid null");
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
-        return returnValue;
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if(!userOpt.isPresent()) {
+            logger.warn("readUser: Not exactly one user found: " + userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        logger.info("readUser: user returned");
+        return UserResponse.convertToUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public InternalResponse changePassword(String userUuid, String oldPassword, String newPassword) {
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if(!userOpt.isPresent()) {
+            logger.warn("changePassword: Not exactly one user found: " + userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        if (PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(oldPassword)) {
+            user.setPasswordHash(PasswordHash.newInstance(newPassword).getPasswordHash());
+            userRepository.save(user);
+            logger.error("changePassword: Password changed" + user.getUuid());
+            return BasicResponse.SUCCESS;
+        }
+        else {
+            logger.info("changePassword: current password wrong");
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+    }
+
+    @Override
+    @Transactional
+    public InternalResponse changeEmail(String userUuid, String newEmailAddress) {
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if(!userOpt.isPresent()) {
+            logger.warn("changeEmail: Not exactly one user found: " +userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        if (!isValidEmailAddress(newEmailAddress)) {
+            logger.info("changeEmail: email not valid " + newEmailAddress);
+            return BasicResponse.EMAIL_ADDRESS_NOT_VALID;
+        }
+        if (user.getEmailAddress().equals(newEmailAddress)) {
+            logger.debug("changeEmail: email address not changed " + newEmailAddress);
+            return BasicResponse.NO_CHANGE_NO_UPDATE;
+        }
+        if (!isEmailUnique(newEmailAddress,userRepository)) {
+            logger.warn("changeEmail: email address already used " + newEmailAddress);
+            return BasicResponse.EMAIL_ADDRESS_ALREADY_EXISTS;
+        }
+        user.setEmailAddress(newEmailAddress);
+        user.setActivationStatus( ActivationStatus.ESTABLISHED);
+        //for changing the email re-activation in necessary
+        UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
+        logger.info("Email change Token:"+userStatusChangeToken.getToken());
+        user.setActivationToken(userStatusChangeToken.getToken(),userStatusChangeToken.getTokenExpiresAt());
+        mailProcessor.sendEmail( EmailType.ACTIVATION_MAIL, user.getEmailAddress(),user.getLoginId(), userStatusChangeToken.getToken());
+        logger.error("changeEmail: email changed" + user.getUuid());
+        userRepository.save(user);
+        return BasicResponse.SUCCESS;
     }
 
 
+    @Override
+    @Transactional
+    public InternalResponse archiveUser(String userUuid, String password) {
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if(!userOpt.isPresent()) {
+            logger.warn("archiveUser: Not exactly one user found: " + userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        if (!user.getActivationStatus().equals(ActivationStatus.ACTIVE)) {
+            logger.warn("archiveUser: user not active " + user.getUuid());
+            return BasicResponse.USER_NOT_ACTIVE;
+        }
+        if (!PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(password)) {
+            logger.warn("archiveUser: user password check failed  " + user.getUuid());
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        logger.error("archiveUser: user archived " + user.getUuid());
+        user.setActivationStatus(ActivationStatus.ARCHIVED);
+        return BasicResponse.SUCCESS;
+    }
+
+    @Override
+    @Transactional
+    public InternalResponse updateUser(String userUuid, String email, AdminRole adminRole, ActivationStatus activationStatus) {
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if(!userOpt.isPresent()) {
+            logger.warn("updateUser: Not exactly one user found: " + userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        if (user.getActivationStatus().equals(activationStatus) &&
+            user.getAdminRole().equals(adminRole) &&
+            user.getEmailAddress().equals(email)
+        ) {
+            logger.warn("updateUser: no change " + user.getUuid());
+            return BasicResponse.NO_CHANGE_NO_UPDATE;
+        }
+        if(!user.getEmailAddress().equals(email)) {
+            if (!isValidEmailAddress(email)) {
+                logger.info("updateUser: email not valid " + email);
+                return BasicResponse.EMAIL_ADDRESS_NOT_VALID;
+            }
+            else if (!isEmailUnique(email,userRepository)) {
+                logger.warn("updateUser: email address already used " + email);
+                return BasicResponse.EMAIL_ADDRESS_ALREADY_EXISTS;
+            }
+            else {
+                user.setEmailAddress(email);
+            }
+        }
+        if(!user.getActivationStatus().equals(activationStatus)) user.setActivationStatus(activationStatus);
+        if(!user.getAdminRole().equals(adminRole)) user.setAdminRole(adminRole);
+        logger.error("updateUser: user updated " + user.getUuid());
+        return BasicResponse.SUCCESS;
+    }
 }

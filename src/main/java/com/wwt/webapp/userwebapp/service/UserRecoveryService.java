@@ -1,13 +1,14 @@
 package com.wwt.webapp.userwebapp.service;
 
-import com.wwt.webapp.userwebapp.domain.request.ExecuteRecoveryRequest;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
+
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
 
 /**
  * @author benw-at-wwt
  */
 public interface UserRecoveryService {
 
+    @SuppressWarnings("SameReturnValue")
     InternalResponse initiateRecovery(String email);
-    InternalResponse recoverUser(ExecuteRecoveryRequest executeRecoveryRequest);
+    InternalResponse recoverUser(String passwordToken, String newPassword);
 }

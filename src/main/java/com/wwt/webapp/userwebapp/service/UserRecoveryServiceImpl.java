@@ -1,93 +1,89 @@
+/*
+ *  Copyright 2019  Wehe Web Technologies - All Rights Reserved
+ *  Unauthorized copying of this file, via any medium is strictly prohibited
+ *  Proprietary and confidential
+ *  Written by Benjamin Wehe (contact@wehe-web-technologies.ch)
+ *
+ */
+
 package com.wwt.webapp.userwebapp.service;
 
 import com.wwt.webapp.userwebapp.domain.ActivationStatus;
-import com.wwt.webapp.userwebapp.domain.UserEntity;
-import com.wwt.webapp.userwebapp.domain.UserStatusChangeToken;
-import com.wwt.webapp.userwebapp.domain.UserStatusChangeTokenImpl;
-import com.wwt.webapp.userwebapp.domain.request.ExecuteRecoveryRequest;
-import com.wwt.webapp.userwebapp.domain.response.BasicResponse;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
-import com.wwt.webapp.userwebapp.domain.response.MessageCode;
+import com.wwt.webapp.userwebapp.domain.relational.UserRepository;
+import com.wwt.webapp.userwebapp.domain.relational.entity.UserEntity;
+import com.wwt.webapp.userwebapp.helper.TimestampHelper;
 import com.wwt.webapp.userwebapp.mail.EmailType;
+import com.wwt.webapp.userwebapp.mail.MailProcessor;
 import com.wwt.webapp.userwebapp.security.PasswordHash;
-import com.wwt.webapp.userwebapp.util.EntityManagerUtil;
-import com.wwt.webapp.userwebapp.util.StaticHelper;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import com.wwt.webapp.userwebapp.service.response.BasicResponse;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
+import com.wwt.webapp.userwebapp.service.response.MessageCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.Optional;
 
 /**
  * @author benw-at-wwt
  */
-public class UserRecoveryServiceImpl extends BaseService implements UserRecoveryService {
+@Service
+public class UserRecoveryServiceImpl extends BaseUserService implements UserRecoveryService {
 
-    private static final Logger logger = Logger.getLogger(UserRecoveryServiceImpl.class);
+    private final static Logger logger = LoggerFactory.getLogger( UserRecoveryServiceImpl.class);
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private MailProcessor mailProcessor;
 
     @Override
+    @Transactional
     public InternalResponse initiateRecovery(String email) {
-        InternalResponse returnValue;
-        em = EntityManagerUtil.getEntityManager();
-        em.getTransaction().begin();
-        List<UserEntity> userEntities = em.createQuery("select u from UserEntity u where u.emailAddress = :emailAddress",UserEntity.class)
-                .setParameter("emailAddress",email)
-                .getResultList();
-        if(userEntities.size() == 1) {
-            UserEntity user = userEntities.get(0);
-            user.setActivationStatus(ActivationStatus.SUSPENDED);
-            UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
-            user.setPasswordRecoveryToken(userStatusChangeToken);
-            if(mailProcessor.isSendMailSuccessful(EmailType.PASSWORD_RECOVERY_MAIL,user.getEmailAddress(),userStatusChangeToken.getToken())) {
-                logger.log(Level.OFF, "initiateRecovery: user locked, mail triggered" + user.getUuid());
-                returnValue = createOperationSuccessfulResponse();
-            }
-            else {
-                logger.error("initiateRecovery: send email failed "+user.getUuid());
-                returnValue = new BasicResponse(false,MessageCode.UNEXPECTED_ERROR);
-            }
-        }
-        else {
+        Optional<UserEntity> userOpt = userRepository.getOperationalUsersByEmailAddress(email);
+        if(!userOpt.isPresent()) {
             logger.error("initiateRecovery: Not exactly one user found: "+email);
             // We have to give success to prevent data mining
-            returnValue = createOperationSuccessfulResponse();
+            return BasicResponse.SUCCESS;
         }
-        handleTransaction(returnValue);
-        return returnValue;
+        UserEntity user = userOpt.get();
+        user.setActivationStatus( ActivationStatus.SUSPENDED);
+        UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
+        user.setPasswordRecoveryToken(userStatusChangeToken.getToken(),userStatusChangeToken.getTokenExpiresAt());
+        logger.info( "password recovery token :"+userStatusChangeToken.getToken() );
+        mailProcessor.sendEmail( EmailType.PASSWORD_RECOVERY_MAIL,user.getEmailAddress(),user.getLoginId(),userStatusChangeToken.getToken());
+        logger.error("initiateRecovery: user locked, mail triggered" + user.getUuid());
+        userRepository.save(user);
+        return BasicResponse.SUCCESS;
     }
 
     @Override
-    public InternalResponse recoverUser(ExecuteRecoveryRequest executeRecoveryRequest) {
-        InternalResponse returnValue;
-        em = EntityManagerUtil.getEntityManager();
-        em.getTransaction().begin();
-        List<UserEntity> userEntities = em.createQuery("select u from UserEntity u where u.passwordRecoveryToken = :passwordRecoveryToken",UserEntity.class)
-                .setParameter("passwordRecoveryToken", executeRecoveryRequest.getPasswordToken())
-                .getResultList();
-        if(userEntities.size() == 1) {
-            UserEntity user = userEntities.get(0);
-            if(user.getActivationStatus().equals(ActivationStatus.SUSPENDED)) {
-                if(user.getPasswordRecoveryTokenExpiresAt().after( StaticHelper.getNowAsUtcTimestamp())) {
-                    user.setActivationStatus(ActivationStatus.ACTIVE);
-                    PasswordHash passwordHash = PasswordHash.newInstance(executeRecoveryRequest.getNewPassword());
-                    user.setPasswordHash(passwordHash.getPasswordHash());
-                    logger.log(Level.OFF,"executeRecovery: user recovered "+user.getUuid());
-                    returnValue = createOperationSuccessfulResponse();
-                }
-                else {
-                    logger.warn("executeRecovery: token expired "+user.getPasswordRecoveryToken());
-                    returnValue = new BasicResponse(false,MessageCode.PASSWORD_RECOVERY_TOKEN_EXPIRED);
-                }
-            }
-            else {
-                logger.warn("executeRecovery: user not in an activation state "+user.getPasswordRecoveryToken());
-                returnValue = new BasicResponse(false,MessageCode.RECOVERY_ALREADY_DONE_OR_NOT_POSSIBLE);
-            }
+    @Transactional
+    public InternalResponse recoverUser(String passwordToken, String newPassword) {
+        Optional<UserEntity> userOpt = userRepository.getUserByPasswordRecoveryToken(passwordToken);
+        if(!userOpt.isPresent()) {
+            logger.error("executeRecovery: Not exactly one user found: "+ passwordToken);
+            return new BasicResponse(false, MessageCode.PASSWORD_TOKEN_NOT_KNOWN);
+        }
+        UserEntity user = userOpt.get();
+        if(!user.getActivationStatus().equals(ActivationStatus.SUSPENDED)) {
+            logger.warn("executeRecovery: user not in an activation state "+user.getPasswordRecoveryToken());
+            return new BasicResponse(false,MessageCode.RECOVERY_ALREADY_DONE_OR_NOT_POSSIBLE);
+        }
+        if(user.getPasswordRecoveryTokenExpiresAt().after( TimestampHelper.getNowAsUtcTimestamp())) {
+            user.setActivationStatus(ActivationStatus.ACTIVE);
+            PasswordHash passwordHash = PasswordHash.newInstance(newPassword);
+            user.setPasswordHash(passwordHash.getPasswordHash());
+            logger.error("executeRecovery: user recovered "+user.getUuid());
+            userRepository.save(user);
+            return BasicResponse.SUCCESS;
         }
         else {
-            logger.error("executeRecovery: Not exactly one user found: "+ executeRecoveryRequest.getPasswordToken());
-            returnValue = new BasicResponse(false,MessageCode.PASSWORD_TOKEN_NOT_KNOWN);
+            logger.warn("executeRecovery: token expired "+user.getPasswordRecoveryToken());
+            return new BasicResponse(false,MessageCode.PASSWORD_RECOVERY_TOKEN_EXPIRED);
         }
-        handleTransaction(returnValue);
-        return returnValue;
     }
 }

@@ -1,91 +1,133 @@
 package com.wwt.webapp.userwebapp.service;
 
 import com.wwt.webapp.userwebapp.domain.ActivationStatus;
-import com.wwt.webapp.userwebapp.domain.UserEntity;
-import com.wwt.webapp.userwebapp.domain.request.AuthenticatedRequest;
-import com.wwt.webapp.userwebapp.domain.response.AuthenticationSuccessResponse;
-import com.wwt.webapp.userwebapp.domain.response.BasicResponse;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
-import com.wwt.webapp.userwebapp.domain.response.MessageCode;
+import com.wwt.webapp.userwebapp.domain.relational.UserRepository;
+import com.wwt.webapp.userwebapp.domain.relational.entity.UserEntity;
+import com.wwt.webapp.userwebapp.helper.TimestampHelper;
 import com.wwt.webapp.userwebapp.mail.EmailType;
+import com.wwt.webapp.userwebapp.mail.MailProcessor;
 import com.wwt.webapp.userwebapp.security.IdToken;
 import com.wwt.webapp.userwebapp.security.PasswordHash;
-import com.wwt.webapp.userwebapp.util.ConfigProvider;
-import com.wwt.webapp.userwebapp.util.EntityManagerUtil;
-import com.wwt.webapp.userwebapp.util.StaticHelper;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import com.wwt.webapp.userwebapp.service.response.AuthenticationSuccessResponse;
+import com.wwt.webapp.userwebapp.service.response.BasicResponse;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
+import com.wwt.webapp.userwebapp.service.response.MessageCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import static com.wwt.webapp.userwebapp.domain.response.MessageCode.USER_NOT_ACTIVE;
+import javax.persistence.EntityManager;
+import java.util.Optional;
 
-import java.util.List;
+import static com.wwt.webapp.userwebapp.helper.ConfigProvider.getConfigIntValue;
+import static com.wwt.webapp.userwebapp.helper.ConfigProvider.getConfigValue;
 
 
 /**
  * @author benw-at-wwt
  */
-public class AuthenticationServiceImpl extends AuthenticatedService implements AuthenticationService {
+@Service
+public class AuthenticationServiceImpl extends BaseUserService implements AuthenticationService {
 
-    private final static Logger logger = Logger.getLogger(AuthenticationServiceImpl.class);
+    private final static Logger logger = LoggerFactory.getLogger( AuthenticationServiceImpl.class);
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private MailProcessor mailProcessor;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Override
-    public InternalResponse authenticate(String loginId, String password,boolean isLongSession) {
-        InternalResponse returnValue;
-        boolean commitNotSuccessfulResponse = false;
-        em = EntityManagerUtil.getEntityManager();
-        em.getTransaction().begin();
-        List<UserEntity> userEntities = getUserEntityWithLoginId(loginId);
-        if(userEntities.size() == 1) {
-            UserEntity user = userEntities.get(0);
-            if(user.getActivationStatus().equals(ActivationStatus.ACTIVE)) {
-                if(user.getFailedLogins() <= Integer.parseInt( ConfigProvider.getConfigValue("maxFailedLoginsUntilSuspension"))) {
-                    if(PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(password)) {
-                        logger.log(Level.OFF,"authenticate: user authenticated " + user.getUuid());
-                        user.setLastLoggedInAt( StaticHelper.getNowAsUtcTimestamp());
-                        IdToken idToken = IdToken.newInstance( ConfigProvider.getConfigValue("appName"),
-                                                              user.getUuid(),
-                                isLongSession? ConfigProvider.getConfigIntValue("ttlLong"): ConfigProvider.getConfigIntValue("ttl"));
-
-                        returnValue = new AuthenticationSuccessResponse(idToken.convertToSignedJwt(), user.getLoginId());
-
-                    }
-                    else {
-                        user.setFailedLogins((user.getFailedLogins())+1);
-                        commitNotSuccessfulResponse = true;
-                        returnValue = createLoginOrPasswordWrong(logger,"authenticate: user password check failed "+user.getUuid());
-                    }
-                }
-                else {
-                    user.setActivationStatus(ActivationStatus.SUSPENDED);
-                    commitNotSuccessfulResponse = true;
-                    if(mailProcessor.isSendMailSuccessful(EmailType.USER_SUSPENDED_MAIL,user.getEmailAddress(),null)) {
-                        logger.warn("authenticate: too many failed logins "+user.getUuid());
-                        returnValue = new BasicResponse(false,MessageCode.TOO_MANY_FAILED_LOGINS);
-                    }
-                    else {
-                        // We need a little bit more escalation here, because user is suspended without notification
-                        logger.error("authenticate: send email failed "+user.getUuid());
-                        returnValue = new BasicResponse(false,MessageCode.UNEXPECTED_ERROR);
-                    }
-                }
+    @Transactional
+    public InternalResponse authenticate(String loginId, String password, boolean isLongSession) {
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId);
+        if(!userOpt.isPresent()) {
+            userOpt = userRepository.getOperationalUsersByEmailAddress(loginId);
+            if(!userOpt.isPresent()) {
+                logger.warn("authenticate: Not exactly one user found: "+loginId);
+                return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+            }
+        }
+        UserEntity user = userOpt.get();
+        if(!user.getActivationStatus().equals( ActivationStatus.ACTIVE)) {
+            logger.warn("authenticate: user not active "+user.getUuid());
+            return new BasicResponse(false, MessageCode.USER_NOT_ACTIVE);
+        }
+        if(user.getFailedLogins() > Integer.parseInt( getConfigValue("maxFailedLoginsUntilSuspension"))) {
+            user.setActivationStatus(ActivationStatus.SUSPENDED);
+            mailProcessor.sendEmail( EmailType.USER_SUSPENDED_MAIL,user.getEmailAddress(),user.getLoginId(),null);
+            logger.warn("authenticate: too many failed logins "+user.getUuid());
+            return new BasicResponse(false, MessageCode.TOO_MANY_FAILED_LOGINS);
+        }
+        if(PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(password)) {
+            logger.error("authenticate: user authenticated " + user.getUuid());
+            user.setLastLoggedInAt( TimestampHelper.getNowAsUtcTimestamp());
+            IdToken idToken = IdToken.newInstance(getConfigValue("appName"),
+                    user.getUuid(),
+                    isLongSession? getConfigIntValue("ttlLong"):getConfigIntValue("ttl"),
+                    user.getAdminRole().toString());
+            if(isLongSession) {
+                RefreshToken r = RefreshToken.newInstance();
+                user.setRefreshToken(r.toString());
+                return new AuthenticationSuccessResponse(idToken.convertToSignedJwt(),r.toString(), user.getLoginId(),user.getAdminRole().toString());
             }
             else {
-                logger.warn("authenticate: user not active "+user.getUuid());
-                returnValue = new BasicResponse(false, USER_NOT_ACTIVE);
+                return new AuthenticationSuccessResponse(idToken.convertToSignedJwt(), user.getLoginId(),user.getAdminRole().toString());
             }
         }
         else {
-            returnValue = createLoginOrPasswordWrong(logger,"authenticate: Not exactly one user found: "+loginId);
+            user.setFailedLogins((user.getFailedLogins())+1);
+            logger.warn("authenticate: user password check failed "+user.getUuid());
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
-        handleTransaction(returnValue,commitNotSuccessfulResponse);
-        return returnValue;
     }
 
-
-    private List<UserEntity> getUserEntityWithLoginId(String loginId) {
-        return em.createQuery("select u from UserEntity u where u.loginId = :loginId",UserEntity.class)
-                .setParameter("loginId",loginId)
-                .getResultList();
+    @Override
+    @Transactional
+    public InternalResponse refreshAuthentication(String refreshToken) {
+        if( refreshToken == null || refreshToken.equals("")) {
+            logger.warn("refreshAuthentication: not valid refresh token: "+refreshToken);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        Optional<UserEntity> userOpt = userRepository.getUserByRefreshToken(refreshToken);
+        if(!userOpt.isPresent()) {
+            logger.warn("refreshAuthentication: Not exactly one user found: "+refreshToken);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+        UserEntity user = userOpt.get();
+        if(!user.getActivationStatus().equals(ActivationStatus.ACTIVE)) {
+            logger.warn("refreshAuthentication: user not active "+user.getUuid());
+            return new BasicResponse(false, MessageCode.USER_NOT_ACTIVE);
+        }
+        logger.error("refreshAuthentication: user authenticated " + user.getUuid());
+        user.setLastLoggedInAt(TimestampHelper.getNowAsUtcTimestamp());
+        IdToken idToken = IdToken.newInstance(getConfigValue("appName"),
+                user.getUuid(),
+                getConfigIntValue("ttlLong"),
+                user.getAdminRole().toString());
+        RefreshToken r = RefreshToken.newInstance();
+        user.setRefreshToken(r.toString());
+        return new AuthenticationSuccessResponse(idToken.convertToSignedJwt(),r.toString(),user.getLoginId(),user.getAdminRole().toString());
     }
 
+    @Override
+    @Transactional
+    public InternalResponse logout(String userUuid) {
+        Optional<UserEntity> userOpt = userRepository.findById(userUuid);
+        if (userOpt.isPresent()) {
+            UserEntity user = userOpt.get();
+            user.setRefreshToken(RefreshToken.getNullInstance().toString());
+            logger.info("logout: user logged out");
+            return BasicResponse.SUCCESS;
+        }
+        else {
+            logger.warn("readUser: Not exactly one user found: " + userUuid);
+            return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
+        }
+    }
 }

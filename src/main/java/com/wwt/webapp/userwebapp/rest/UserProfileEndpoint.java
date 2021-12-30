@@ -1,94 +1,62 @@
 package com.wwt.webapp.userwebapp.rest;
 
-
-import com.wwt.webapp.userwebapp.domain.request.*;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
 import com.wwt.webapp.userwebapp.service.UserService;
-import com.wwt.webapp.userwebapp.service.UserServiceImpl;
-import org.apache.log4j.Logger;
+import com.wwt.webapp.userwebapp.service.request.ArchiveRequest;
+import com.wwt.webapp.userwebapp.service.request.EmailChangeRequest;
+import com.wwt.webapp.userwebapp.service.request.InternalRequest;
+import com.wwt.webapp.userwebapp.service.request.PasswordChangeRequest;
+import com.wwt.webapp.userwebapp.service.response.BasicResponse;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import javax.ws.rs.*;
-import javax.ws.rs.core.Cookie;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
-/**
- * @author benw-at-wwt
- */
-@Path("/user")
-public class UserProfileEndpoint extends AuthenticatedEndpoint {
 
-    private static final Logger logger = Logger.getLogger(UserProfileEndpoint.class);
+@RestController
+public class UserProfileEndpoint extends BasicEndpoint {
 
-    private final UserService userService = new UserServiceImpl();
+    private static final Logger logger = LoggerFactory.getLogger(UserProfileEndpoint.class);
 
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getUser(@CookieParam("id_token") Cookie cookie) {
-        evaluateAccessRisk(logger, new InternalRequest() { @Override public String toString() { return "GET"; }});
-        if(!isAuthParametersOk(cookie)) { return Response.status(302).build();}
+    @Autowired
+    private UserService userService;
 
-        logger.info( "getUser:"+cookie.getValue() );
-        AuthenticatedRequest ar = new AuthenticatedRequest();
-        ar.setIdToken(cookie.getValue());
-        InternalResponse response = userService.readUser(ar);
-        if (response.isSuccessful()) {
-            return Response.ok(response).build();
-        } else {
-            return Response.status(getHttpStatusCode(response)).entity(response).build();
-        }
+    @GetMapping(value="/user", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<InternalResponse> getUser(@CookieValue("id_token") Cookie cookie, HttpServletRequest request) {
+        evaluateAccessRisk(logger,request, new InternalRequest() { @Override public String toString() { return "GET getUser"; }});
+        if(!isAuthParametersOk(cookie)) { return ResponseEntity.status(302).build();}
+        if(!isAuthenticated(cookie.getValue())) { return ResponseEntity.status(getHttpStatusCode( BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID); }
+        return renderResponse(userService.readUser(getAuthenticatedUserUuid(cookie.getValue())));
     }
 
-    @Path("/emailchange")
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response updateEmailAddress(@CookieParam("id_token") Cookie cookie,final EmailChangeRequest emailChangeRequest) {
-        evaluateAccessRisk(logger, emailChangeRequest);
-        if(!isAuthParametersOk(cookie)) { return Response.status(302).build();}
 
-        logger.info( "updateEmailAddress:"+cookie.getValue() );
-        emailChangeRequest.setIdToken(cookie.getValue());
-        InternalResponse response = userService.changeEmail(emailChangeRequest);
-        if (response.isSuccessful()) {
-            return Response.ok(response).build();
-        } else {
-            return Response.status(getHttpStatusCode(response)).entity(response).build();
-        }
+    @PostMapping(value="/user/emailchange", consumes=MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<InternalResponse> updateEmailAddress(@CookieValue("id_token") Cookie cookie, @RequestBody EmailChangeRequest emailChangeRequest, HttpServletRequest request) {
+        evaluateAccessRisk(logger,request, emailChangeRequest);
+        if(!isAuthParametersOk(cookie)) { return ResponseEntity.status(302).build();}
+        if(!isAuthenticated(cookie.getValue())) { return ResponseEntity.status(getHttpStatusCode(BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID); }
+        return renderResponse(userService.changeEmail(getAuthenticatedUserUuid(cookie.getValue()),emailChangeRequest.getEmail()));
     }
 
-    @Path("/passwordchange")
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response changePassword(@CookieParam("id_token") Cookie cookie, PasswordChangeRequest pwChangeReq) {
-        evaluateAccessRisk(logger, pwChangeReq);
-        if(!isAuthParametersOk(cookie)) { return Response.status(302).build();}
-
-        logger.info( "changePassword:"+cookie.getValue() );
-        pwChangeReq.setIdToken(cookie.getValue());
-        InternalResponse response = userService.changePassword(pwChangeReq);
-        if (response.isSuccessful()) {
-            return Response.ok(response).build();
-        } else {
-            return Response.status(getHttpStatusCode(response)).entity(response).build();
-        }
+    @PostMapping(value="/user/passwordchange", consumes=MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<InternalResponse> changePassword(@CookieValue("id_token") Cookie cookie, @RequestBody PasswordChangeRequest pwChangeReq, HttpServletRequest request) {
+        evaluateAccessRisk(logger,request, pwChangeReq);
+        if(!isAuthParametersOk(cookie)) { return ResponseEntity.status(302).build();}
+        if(!isAuthenticated(cookie.getValue())) { return ResponseEntity.status(getHttpStatusCode(BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID); }
+        return renderResponse(userService.changePassword(getAuthenticatedUserUuid(cookie.getValue()),pwChangeReq.getOldPassword(),pwChangeReq.getNewPassword()));
     }
 
-    @DELETE
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response archiveUser(@CookieParam("id_token") Cookie cookie, ArchiveRequest archiveRequest) {
-        evaluateAccessRisk(logger, archiveRequest);
-        if(!isAuthParametersOk(cookie)) { return Response.status(302).build();}
-
-        logger.info( "archiveUser:"+cookie.getValue() );
-        archiveRequest.setIdToken(cookie.getValue());
-        InternalResponse response = userService.archiveUser(archiveRequest);
-        if (response.isSuccessful()) {
-            return Response.ok(response).build();
-        } else {
-            return Response.status(getHttpStatusCode(response)).entity(response).build();
-        }
+    @DeleteMapping(value="/user", consumes=MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<InternalResponse> archiveUser(@CookieValue("id_token") Cookie cookie, @RequestBody ArchiveRequest archiveRequest, HttpServletRequest request) {
+        evaluateAccessRisk(logger,request, archiveRequest);
+        if(!isAuthParametersOk(cookie)) { return ResponseEntity.status(302).build();}
+        if(!isAuthenticated(cookie.getValue())) { return ResponseEntity.status(getHttpStatusCode(BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID); }
+        return renderResponse(userService.archiveUser(getAuthenticatedUserUuid(cookie.getValue()),archiveRequest.getPassword()));
     }
 
 }

@@ -42,7 +42,7 @@ public final class PasswordHash {
     }
 
     public static PasswordHash newInstance(String password) {
-        return new PasswordHash(password,HashAlgorithmFactory.getInstance());
+        return new PasswordHash(password, HashAlgorithmFactory.getInstance());
     }
 
 }

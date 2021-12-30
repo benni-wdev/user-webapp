@@ -5,5 +5,5 @@ package com.wwt.webapp.userwebapp.mail;
  */
 public interface MailProcessor {
 
-    boolean isSendMailSuccessful(EmailType emailType, String emailAddress, String token);
+    void sendEmail(EmailType emailType, String emailAddress,String loginId, String token);
 }

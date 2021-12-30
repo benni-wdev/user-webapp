@@ -1,11 +1,9 @@
 package com.wwt.webapp.userwebapp.service;
 
-import com.wwt.webapp.userwebapp.domain.request.ArchiveRequest;
-import com.wwt.webapp.userwebapp.domain.request.AuthenticatedRequest;
-import com.wwt.webapp.userwebapp.domain.request.EmailChangeRequest;
-import com.wwt.webapp.userwebapp.domain.request.PasswordChangeRequest;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
 
+import com.wwt.webapp.userwebapp.domain.ActivationStatus;
+import com.wwt.webapp.userwebapp.domain.AdminRole;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
 
 /**
  * @author benw-at-wwt
@@ -13,9 +11,11 @@ import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
 public interface UserService {
 
 
-    InternalResponse readUser(AuthenticatedRequest request);
-    InternalResponse changePassword(PasswordChangeRequest passwordChangeReq);
-    InternalResponse changeEmail(EmailChangeRequest emailChangeReq);
-    InternalResponse archiveUser(ArchiveRequest archiveRequestRequest);
+    InternalResponse readUser(String userUuid);
+    InternalResponse changePassword(String userUuid, String oldPassword, String newPassword);
+    InternalResponse changeEmail(String userUuid, String newEmailAddress);
+    InternalResponse archiveUser(String userUuid, String password);
+    InternalResponse readAllUsers();
+    InternalResponse updateUser(String userUuid, String email, AdminRole adminRole, ActivationStatus activationStatus);
 
 }

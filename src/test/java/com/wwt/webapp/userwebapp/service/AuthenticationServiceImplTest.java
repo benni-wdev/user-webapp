@@ -1,21 +1,33 @@
 package com.wwt.webapp.userwebapp.service;
 
-import com.wwt.webapp.userwebapp.domain.request.AuthenticatedRequest;
-import com.wwt.webapp.userwebapp.domain.response.AuthenticationSuccessResponse;
-import com.wwt.webapp.userwebapp.domain.response.InternalResponse;
-import com.wwt.webapp.userwebapp.domain.response.MessageCode;
+import com.wwt.webapp.userwebapp.domain.ActivationStatus;
+import com.wwt.webapp.userwebapp.domain.AdminRole;
+import com.wwt.webapp.userwebapp.domain.relational.UserRepository;
+import com.wwt.webapp.userwebapp.domain.relational.entity.UserEntity;
 import com.wwt.webapp.userwebapp.security.IdToken;
 import com.wwt.webapp.userwebapp.security.PasswordHash;
-import com.wwt.webapp.userwebapp.domain.*;
-import com.wwt.webapp.userwebapp.util.ConfigProvider;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import com.wwt.webapp.userwebapp.security.TestContextSetter;
+import com.wwt.webapp.userwebapp.service.response.AuthenticationSuccessResponse;
+import com.wwt.webapp.userwebapp.service.response.InternalResponse;
+import com.wwt.webapp.userwebapp.service.response.MessageCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import static org.junit.Assert.*;
-
-import javax.persistence.EntityManager;
 import java.time.Instant;
+import java.util.Optional;
 
+import static com.wwt.webapp.userwebapp.helper.ConfigProvider.getConfigIntValue;
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(SpringExtension.class)
+@DataJpaTest
+@TestPropertySource("classpath:application-test.properties")
 public class AuthenticationServiceImplTest extends BaseServiceTest {
 
     private static final UserStatusChangeToken token1 =  UserStatusChangeTokenImpl.newInstance();
@@ -56,6 +68,7 @@ public class AuthenticationServiceImplTest extends BaseServiceTest {
     private static final String emailAddress7 = "AuthenticationServiceImplTest7@test.test";
     private static final String password7 = "password7";
     private static final PasswordHash pwHash7 = PasswordHash.newInstance(password7);
+    private static final RefreshToken refreshToken7 = RefreshToken.newInstance();
 
 
     private static final UserStatusChangeToken token8 =  UserStatusChangeTokenImpl.newInstance();
@@ -63,141 +76,214 @@ public class AuthenticationServiceImplTest extends BaseServiceTest {
     private static final String emailAddress8 = "AuthenticationServiceImplTest8@test.test";
     private static final String password8 = "password8";
     private static final PasswordHash pwHash8 = PasswordHash.newInstance(password8);
+    private static final RefreshToken refreshToken8 = RefreshToken.newInstance();
+
+    private static final RefreshToken refreshToken9 = RefreshToken.newInstance();
 
     private static final UserStatusChangeToken token10 =  UserStatusChangeTokenImpl.newInstance();
     private static final String loginId10 = "AuthenticationServiceImplTest10";
     private static final String emailAddress10 = "AuthenticationServiceImplTest10@test.test";
     private static final String password10 = "password10";
     private static final PasswordHash pwHash10 = PasswordHash.newInstance(password10);
+    private static final RefreshToken refreshToken10 = RefreshToken.newInstance();
 
-    @BeforeClass
-    @SuppressWarnings({"unused", "UnusedAssignment"})
-    public static void createData() {
-        EntityManager em = getEntityManager();
-        em.getTransaction().begin();
-        UserEntity u1 = new UserEntity(loginId1, emailAddress1, pwHash1.getPasswordHash(), token1);
-        UserEntity u2 = new UserEntity(loginId2, emailAddress2, pwHash2.getPasswordHash(), token2);
-        UserEntity u3 = new UserEntity(loginId3, emailAddress3, pwHash3.getPasswordHash(), token3);
-        UserEntity u4 = new UserEntity(loginId4, emailAddress4, pwHash4.getPasswordHash(), token4);
-        UserEntity u6 = new UserEntity(loginId6, emailAddress6, pwHash6.getPasswordHash(), token6);
-        UserEntity u7 = new UserEntity(loginId7, emailAddress7, pwHash7.getPasswordHash(), token7);
-        UserEntity u8 = new UserEntity(loginId8, emailAddress8, pwHash8.getPasswordHash(), token8);
-        UserEntity u10 = new UserEntity(loginId10, emailAddress10, pwHash10.getPasswordHash(), token10);
-        u6.setActivationStatus( ActivationStatus.SUSPENDED );
-        u8.setActivationStatus( ActivationStatus.SUSPENDED );
-        u10.setActivationStatus( ActivationStatus.ACTIVE );
-        em.persist(u1);
-        em.persist(u2);
-        em.persist(u3);
-        em.persist(u4);
-        em.persist(u6);
-        em.persist(u7);
-        em.persist(u8);
-        em.persist(u10);
-        em.getTransaction().commit();
-        closeEntityManager(em);
+    private static boolean initialized = false;
 
-        ActivationService as = new ActivationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse response = as.activateUser(token1.getToken());
-        assignDependenyObjects((BaseService)as);
-        response = as.activateUser(token2.getToken());
-        assignDependenyObjects((BaseService)as);
-        response = as.activateUser(token3.getToken());
-        assignDependenyObjects((BaseService)as);
-        response = as.activateUser(token7.getToken());
+    @Autowired
+    private TestEntityManager entityManager;
+
+    @Autowired
+    UserRepository userRepository;
+
+    @Autowired
+    AuthenticationService authenticationService;
+
+    @Autowired
+    ActivationService activationService;
+
+
+    @BeforeEach
+    public void initObjects() {
+        if(!initialized) {
+            TestContextSetter.setTestContext();
+            assignDependenyObjects((BaseUserService)activationService);
+            assignDependenyObjects((BaseUserService)authenticationService);
+            initialized = true;
+        }
+    }
+
+    @Test
+    public void refreshAuthentication() {
+        UserEntity u7 = new UserEntity(loginId7, emailAddress7, pwHash7.getPasswordHash(), token7.getToken(), token7.getTokenExpiresAt());
+        u7.setRefreshToken(refreshToken7.toString());
+        entityManager.persistAndFlush(u7);
+        activationService.activateUser(token7.getToken());
+        InternalResponse internalResponse = authenticationService.refreshAuthentication(refreshToken7.toString());
+        assertTrue( internalResponse.isSuccessful());
+        assertEquals( MessageCode.OPERATION_SUCCESSFUL, internalResponse.getMessageCode());
+        String token = ((AuthenticationSuccessResponse)internalResponse).getToken();
+        String refreshToken = ((AuthenticationSuccessResponse)internalResponse).getRefreshToken();
+        IdToken idToken = IdToken.parse(token);
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId7);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
+        assertEquals(loginId7,u.getLoginId());
+        assertNotNull(refreshToken);
+        assertEquals(u.getUuid(),idToken.getSubject());
+        assertNotEquals( refreshToken,refreshToken7.toString() );
+    }
+    @Test
+    public void refreshAuthUserNotActive() {
+        UserEntity u8 = new UserEntity(loginId8, emailAddress8, pwHash8.getPasswordHash(), token8.getToken(), token8.getTokenExpiresAt());
+        u8.setActivationStatus( ActivationStatus.SUSPENDED);
+        u8.setRefreshToken(refreshToken8.toString());
+        entityManager.persistAndFlush(u8);
+        InternalResponse internalResponse = authenticationService.refreshAuthentication(refreshToken8.toString());
+        assertFalse( internalResponse.isSuccessful());
+        assertEquals(MessageCode.USER_NOT_ACTIVE, internalResponse.getMessageCode());
+    }
+
+    @Test
+    public void refreshAuthNoUser() {
+        InternalResponse internalResponse = authenticationService.refreshAuthentication(refreshToken9.toString());
+        assertFalse( internalResponse.isSuccessful());
+        assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
     }
 
     @Test
     public void authenticate() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId1,password1,false);
+        UserEntity u1 = new UserEntity(loginId1, emailAddress1, pwHash1.getPasswordHash(), token1.getToken(), token1.getTokenExpiresAt());
+        entityManager.persistAndFlush(u1);
+        activationService.activateUser(token1.getToken());
+        InternalResponse internalResponse = authenticationService.authenticate(loginId1,password1,false);
         assertTrue( internalResponse.isSuccessful());
-        assertEquals(MessageCode.OPERATION_SUCCESSFUL, internalResponse.getMessageCode());
+        assertEquals( MessageCode.OPERATION_SUCCESSFUL, internalResponse.getMessageCode());
         String token = ((AuthenticationSuccessResponse)internalResponse).getToken();
         IdToken idToken = IdToken.parse(token);
-        UserEntity u = getUserByLoginId(loginId1);
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId1);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
         assertEquals(loginId1,u.getLoginId());
         assertEquals(u.getUuid(),idToken.getSubject());
     }
 
     @Test
+    public void authenticate2() {
+        UserEntity u1 = new UserEntity(loginId1, emailAddress1, pwHash1.getPasswordHash(), token1.getToken(), token1.getTokenExpiresAt());
+        u1.setAdminRole( AdminRole.FULL_ADMIN);
+        entityManager.persistAndFlush(u1);
+        activationService.activateUser(token1.getToken());
+        InternalResponse internalResponse = authenticationService.authenticate(loginId1,password1,false);
+        assertTrue( internalResponse.isSuccessful());
+        assertEquals(MessageCode.OPERATION_SUCCESSFUL, internalResponse.getMessageCode());
+        String token = ((AuthenticationSuccessResponse)internalResponse).getToken();
+        IdToken idToken = IdToken.parse(token);
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId1);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
+        assertEquals(loginId1,u.getLoginId());
+        assertEquals(u.getUuid(),idToken.getSubject());
+        assertEquals(AdminRole.FULL_ADMIN.toString(),idToken.getAdminRole());
+        assertEquals(AdminRole.FULL_ADMIN.toString(),((AuthenticationSuccessResponse)internalResponse).getAdminRole());
+    }
+
+    @Test
     public void passwordWrong() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId2,password21,false);
+        UserEntity u2 = new UserEntity(loginId2, emailAddress2, pwHash2.getPasswordHash(), token2.getToken(), token2.getTokenExpiresAt());
+        entityManager.persistAndFlush(u2);
+        activationService.activateUser(token2.getToken());
+        InternalResponse internalResponse = authenticationService.authenticate(loginId2,password21,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
     }
 
     @Test
     public void loginWrong() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId5,password5,false);
+        InternalResponse internalResponse = authenticationService.authenticate(loginId5,password5,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
     }
 
     @Test
     public void wrongTries() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId3,password31,false);
+        UserEntity u3 = new UserEntity(loginId3, emailAddress3, pwHash3.getPasswordHash(), token3.getToken(), token3.getTokenExpiresAt());
+        entityManager.persistAndFlush(u3);
+        activationService.activateUser(token3.getToken());
+        InternalResponse internalResponse = authenticationService.authenticate(loginId3,password31,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
-        assignDependenyObjects((BaseService)as);
-        internalResponse = as.authenticate(loginId3,password31,false);
+        internalResponse = authenticationService.authenticate(loginId3,password31,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
-        assignDependenyObjects((BaseService)as);
-        internalResponse = as.authenticate(loginId3,password31,false);
+        internalResponse = authenticationService.authenticate(loginId3,password31,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
-        assignDependenyObjects((BaseService)as);
-        internalResponse = as.authenticate(loginId3,password31,false);
+        internalResponse = authenticationService.authenticate(loginId3,password31,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.LOGIN_OR_PASSWORD_WRONG, internalResponse.getMessageCode());
-        assignDependenyObjects((BaseService)as);
-        internalResponse = as.authenticate(loginId3,password31,false);
+        internalResponse = authenticationService.authenticate(loginId3,password31,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.TOO_MANY_FAILED_LOGINS, internalResponse.getMessageCode());
-        UserEntity u = getUserByLoginId(loginId3);
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId3);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
         assertEquals(ActivationStatus.SUSPENDED,u.getActivationStatus());
     }
 
     @Test
     public void userNotActive() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId4,password4,false);
+        UserEntity u4 = new UserEntity(loginId4, emailAddress4, pwHash4.getPasswordHash(), token4.getToken(), token4.getTokenExpiresAt());
+        entityManager.persistAndFlush(u4);
+        UserEntity u6 = new UserEntity(loginId6, emailAddress6, pwHash6.getPasswordHash(), token6.getToken(), token6.getTokenExpiresAt());
+        u6.setActivationStatus(ActivationStatus.SUSPENDED);
+        entityManager.persistAndFlush(u6);
+        InternalResponse internalResponse = authenticationService.authenticate(loginId4,password4,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.USER_NOT_ACTIVE, internalResponse.getMessageCode());
-        assignDependenyObjects((BaseService)as);
-        internalResponse = as.authenticate(loginId6,password6,false);
+        internalResponse = authenticationService.authenticate(loginId6,password6,false);
         assertFalse( internalResponse.isSuccessful());
         assertEquals(MessageCode.USER_NOT_ACTIVE, internalResponse.getMessageCode());
     }
-
 
     @Test
     public void authenticateLong() {
-        AuthenticationService as = new AuthenticationServiceImpl();
-        assignDependenyObjects((BaseService)as);
-        InternalResponse internalResponse = as.authenticate(loginId1,password1,true);
+        UserEntity u1 = new UserEntity(loginId1, emailAddress1, pwHash1.getPasswordHash(), token1.getToken(), token1.getTokenExpiresAt());
+        entityManager.persistAndFlush(u1);
+        activationService.activateUser(token1.getToken());
+        InternalResponse internalResponse = authenticationService.authenticate(loginId1,password1,true);
         assertTrue( internalResponse.isSuccessful());
         assertEquals(MessageCode.OPERATION_SUCCESSFUL, internalResponse.getMessageCode());
         String token = ((AuthenticationSuccessResponse)internalResponse).getToken();
+        String refreshToken = ((AuthenticationSuccessResponse)internalResponse).getRefreshToken();
         IdToken idToken = IdToken.parse(token);
-        Instant compare1 = Instant.now().plusSeconds( ConfigProvider.getConfigIntValue("ttl")*2);
-        Instant compare2 = Instant.now().plusSeconds( ConfigProvider.getConfigIntValue("ttlLong")*2);
+        Instant compare1 = Instant.now().plusSeconds(getConfigIntValue("ttl")*2);
+        Instant compare2 = Instant.now().plusSeconds(getConfigIntValue("ttlLong")*2);
         assertTrue(idToken.getExpiresAt().isAfter(compare1)
                 && idToken.getExpiresAt().isBefore(compare2));
-        UserEntity u = getUserByLoginId(loginId1);
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId1);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
         assertEquals(loginId1,u.getLoginId());
+        assertNotNull(refreshToken);
+        assertEquals(u.getRefreshToken(),refreshToken);
         assertEquals(u.getUuid(),idToken.getSubject());
     }
 
+    @Test
+    public void logoutTest() {
+        UserEntity u10 = new UserEntity(loginId10, emailAddress10, pwHash10.getPasswordHash(), token10.getToken(), token10.getTokenExpiresAt());
+        u10.setActivationStatus( ActivationStatus.ACTIVE);
+        u10.setRefreshToken(refreshToken10.toString());
+        entityManager.persistAndFlush(u10);
+        authenticationService.authenticate(loginId10,password10,true);
+
+        InternalResponse r2 =  authenticationService.logout(convertToUuid(userRepository,loginId10));
+        Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId10);
+        assertTrue(userOpt.isPresent());
+        UserEntity u = userOpt.get();
+        assertEquals("",u.getRefreshToken());
+        assertTrue( r2.isSuccessful() );
+        assertEquals( MessageCode.OPERATION_SUCCESSFUL,r2.getMessageCode() );
+    }
 
 }

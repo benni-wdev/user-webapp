@@ -1,0 +1,13 @@
+version: '3'
+services:
+  web:
+    build: webapp
+    container_name: webapp
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:+UseG1GC -XX:+PrintGC -Xms1024m -Xmx1024m"
+    ports:
+      - "8443:8443"
+      - "8080:8080"
+    volumes:
+      - ./webapp/log:/log
+      - ./webapp/keystore:/keystore

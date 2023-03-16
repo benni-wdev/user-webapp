@@ -74,7 +74,7 @@
 <h2> Get it running with docker </h2>    
     <ul>
         <li>look at get it running above</li>
-        <li> check out the blog entry here:[https://www.wdev.ch/running-a-java-app-with-docker/](https://www.wdev.ch/running-a-java-app-with-docker/)</li>
+        <li> check out the blog entry here: https://www.wdev.ch/running-a-java-app-with-docker </li>
     </ul>
 
 

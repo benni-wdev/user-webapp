@@ -1,6 +1,4 @@
 <h1> Java Web app providing Registration, Login and Data Change flows</h1>
-
-
 <ul>
     <li><h5>This includes:</h5></li>
         <li>Sign up with Email verificiation</li>
@@ -10,6 +8,12 @@
         <li>Password change</li>
         <li>User deletion</li>
 </ul>
+
+<h2> Changes </h2>
+ <ul>
+        <li>March 2023: Added/Edited some files to run it with docker</li>
+</ul>
+
 
 <h2> Frontend is build with </h2>
      <ul>
@@ -67,7 +71,13 @@
         <li>base Urls for links in emails</li>
         <li>...</li>
     </ul>
-    
+<h2> Get it running with docker </h2>    
+    <ul>
+        <li>look at get it running above</li>
+        <li> check out the blog entry here:[https://www.wdev.ch/running-a-java-app-with-docker/](https://www.wdev.ch/running-a-java-app-with-docker/)</li>
+    </ul>
+
+
 --------------------------------------
 benni-wdev
 

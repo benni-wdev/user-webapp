@@ -292,7 +292,7 @@
                                     <outputDirectory>${basedir}/target/docker/webapp/keystore</outputDirectory>
                                     <resources>
                                         <resource>
-                                            <directory>src/main/docker/webapp/keystore</directory>
+                                            <directory>.keystore</directory>
                                             <includes>
                                                 <include>**/*.*</include>
                                             </includes>

@@ -26,8 +26,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 
-import javax.mail.MessagingException;
-import javax.mail.internet.MimeMessage;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -54,7 +54,7 @@ public class SharedMailSenderImpl implements SharedMailSender {
         String fromEmail = getConfigValue("fromEmail");
 
         if (getConfigBoolean("isMailingEnabled") ) {
-            String html = "";
+            String html;
             try {
                 freemarkerConfig.setClassForTemplateLoading( this.getClass(), "/templates" );
                 Template t = freemarkerConfig.getTemplate( "basic.ftl" );

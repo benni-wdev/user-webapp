@@ -27,9 +27,7 @@
                 <maxHistory>60</maxHistory>
             </rollingPolicy>
 
-            <encoder>
-                <pattern>%d %p %c{1.} [%t] %m%n</pattern>
-            </encoder>
+            <encoder> <pattern>%d %-5level [%thread] %logger{0}: %msg%n</pattern></encoder>
         </appender>
         <root level="WARN">
             <appender-ref ref="FILE-ROLLING"/>

@@ -1,4 +1,4 @@
-FROM openjdk:8
+FROM openjdk:17
 
 ADD jar/user-webapp.jar user-webapp.jar
 

@@ -40,7 +40,7 @@ class Keys {
 
     static boolean isTestContext = false;
 
-    public static KeyPair getKeyPair() {
+    static KeyPair getKeyPair() {
         if(keyPair == null) {
             initKeyPair();
         }

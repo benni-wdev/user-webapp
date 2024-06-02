@@ -15,31 +15,19 @@
 package com.wwt.webapp.userwebapp.service.request;
 
 
+import lombok.*;
 
 /**
  * @author benw-at-wwt
  */
 @SuppressWarnings("unused")
+@Setter
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class RefreshAuthenticationRequest implements InternalRequest {
 
     private String refreshToken;
 
-    public RefreshAuthenticationRequest() {
-    }
-
-    public String getRefreshToken() {
-        return refreshToken;
-    }
-
-    public void setRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
-    }
-
-
-    @Override
-    public String toString() {
-        return "RefreshAuthenticationRequest{" +
-                "refreshToken='" + refreshToken + '\'' +
-                '}';
-    }
 }

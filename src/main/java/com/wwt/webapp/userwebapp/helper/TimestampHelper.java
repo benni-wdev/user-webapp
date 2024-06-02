@@ -14,8 +14,8 @@
  */
 package com.wwt.webapp.userwebapp.helper;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
 import java.time.*;
@@ -25,9 +25,8 @@ import java.time.temporal.TemporalAccessor;
 /**
  * @author benw-at-wwt
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TimestampHelper {
-
-    private final static Logger logger = LoggerFactory.getLogger( TimestampHelper.class);
 
     public final static long twentyFourHoursAsMillis = 24 * 60 *60 *1000;
     public final static long oneMinuteAsMillis = 60 *1000;
@@ -36,8 +35,6 @@ public final class TimestampHelper {
     public final static long twoHoursAsMillis = 2 * 60 *60 *1000;
     public final static long fourHoursAsMillis = 4 * 60 *60 *1000;
 
-
-    private TimestampHelper() {}
 
     public static Timestamp getNowAsUtcTimestamp() {
         OffsetDateTime utc = OffsetDateTime.now(ZoneOffset.UTC);
@@ -60,7 +57,7 @@ public final class TimestampHelper {
     public static long getNowAsUtcEpochSeconds() { return getNowAsUtcInstant().getEpochSecond(); }
 
     public static Timestamp getNowPlusMinsAsUtcTimestamp(int minsInFuture) {
-        return getNowPlusAsUtcTimestamp(minsInFuture*60);
+        return getNowPlusAsUtcTimestamp(minsInFuture*60L);
     }
 
     public static Timestamp getNowPlusAsUtcTimestamp(long secondsInFuture) {
@@ -89,7 +86,7 @@ public final class TimestampHelper {
     }
 
     public static boolean isNearNow(long timestampToCheck,int offsetSeconds) {
-        return (timestampToCheck > (getNowAsUtcEpochMilli()-(offsetSeconds*1000))) && (timestampToCheck < (getNowAsUtcEpochMilli()+(offsetSeconds*1000)));
+        return (timestampToCheck > (getNowAsUtcEpochMilli()-(offsetSeconds*1000L))) && (timestampToCheck < (getNowAsUtcEpochMilli()+(offsetSeconds*1000L)));
     }
 
     public static Timestamp convertLongToTimestamp(long time) {

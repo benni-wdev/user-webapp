@@ -39,7 +39,7 @@ abstract class BaseUserService  {
 
     boolean isEmailUnique(String emailAddress, UserRepository userRepository) {
         Optional<UserEntity> userOpt = userRepository.getOperationalUsersByEmailAddress(emailAddress);
-        return !userOpt.isPresent();
+        return userOpt.isEmpty();
     }
 
     boolean isValidLoginId(String loginId) {
@@ -54,7 +54,7 @@ abstract class BaseUserService  {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     protected boolean isUserValid(Optional<UserEntity> userOpt) {
-        if (!userOpt.isPresent()) {
+        if (userOpt.isEmpty()) {
             logger.warn("checkUserConstraints: Not exactly one user found");
             return false;
         }

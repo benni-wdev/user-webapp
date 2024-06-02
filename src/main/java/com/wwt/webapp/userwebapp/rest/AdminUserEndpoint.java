@@ -29,8 +29,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 public class AdminUserEndpoint extends BasicEndpoint {
@@ -47,7 +47,7 @@ public class AdminUserEndpoint extends BasicEndpoint {
         if(!isAuthenticated(cookie.getValue())) {
             return ResponseEntity.status(getHttpStatusCode( BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID);
         }
-        logger.info( "getUserById:"+cookie.getValue() );
+        logger.info( "getUserById: {}",cookie.getValue() );
         if(!isAuthorized(cookie.getValue(), AdminRole.READ_ONLY_ADMIN)) {
             return ResponseEntity.status(getHttpStatusCode(BasicResponse.FORBIDDEN)).body(BasicResponse.FORBIDDEN);
         }
@@ -63,7 +63,7 @@ public class AdminUserEndpoint extends BasicEndpoint {
         if(!isAuthenticated(cookie.getValue())) {
             return ResponseEntity.status(getHttpStatusCode(BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID);
         }
-        logger.info( "updateUser:"+cookie.getValue() );
+        logger.info( "updateUser:{}",cookie.getValue() );
         if(!isAuthorized(cookie.getValue(), AdminRole.FULL_ADMIN)) {
             return ResponseEntity.status(getHttpStatusCode(BasicResponse.FORBIDDEN)).body(BasicResponse.FORBIDDEN);
         }
@@ -78,7 +78,7 @@ public class AdminUserEndpoint extends BasicEndpoint {
         if(!isAuthenticated(cookie.getValue())) {
             return ResponseEntity.status(getHttpStatusCode(BasicResponse.SESSION_INVALID)).body(BasicResponse.SESSION_INVALID);
         }
-        logger.info( "getAllUsers:"+cookie.getValue() );
+        logger.info( "getAllUsers:{}",cookie.getValue() );
         if(!isAuthorized(cookie.getValue(), AdminRole.READ_ONLY_ADMIN)) {
             return ResponseEntity.status(getHttpStatusCode(BasicResponse.FORBIDDEN)).body(BasicResponse.FORBIDDEN);
         }

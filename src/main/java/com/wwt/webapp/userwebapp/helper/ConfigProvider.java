@@ -14,6 +14,8 @@
  */
 package com.wwt.webapp.userwebapp.helper;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ConfigProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigProvider.class);
@@ -29,7 +32,6 @@ public class ConfigProvider {
     private static final String propFileName = "/config.properties";
     private static Properties prop;
 
-    private ConfigProvider() {}
 
     private static Properties getPropValues() {
         Properties prop = new Properties();

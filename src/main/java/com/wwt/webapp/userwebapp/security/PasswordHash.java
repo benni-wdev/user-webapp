@@ -14,6 +14,7 @@
  */
 package com.wwt.webapp.userwebapp.security;
 
+import lombok.Getter;
 
 /**
  *
@@ -21,6 +22,7 @@ package com.wwt.webapp.userwebapp.security;
  */
 public final class PasswordHash {
 
+    @Getter
     private final String passwordHash;
     private HashAlgorithm hashAlgorithm;
 
@@ -42,11 +44,6 @@ public final class PasswordHash {
     public boolean isPasswordHashEquals(String password) {
         return hashAlgorithm.isPasswordEquals(password,passwordHash);
     }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
 
 
     public static PasswordHash getInstance(String passwordHash) {

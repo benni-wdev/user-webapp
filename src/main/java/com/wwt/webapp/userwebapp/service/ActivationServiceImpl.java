@@ -44,22 +44,22 @@ public class ActivationServiceImpl extends BaseUserService implements Activation
     @Transactional
     public InternalResponse activateUser(final String activationToken) {
         Optional<UserEntity> userOpt = userRepository.getUserByActivationToken(activationToken);
-        if(!userOpt.isPresent()) {
-            logger.warn("activateUser: Not exactly one user found: "+activationToken);
+        if(userOpt.isEmpty()) {
+            logger.warn("activateUser: Not exactly one user found: {}",activationToken);
             return BasicResponse.ACTIVATION_TOKEN_NOT_KNOWN;
         }
         UserEntity user = userOpt.get();
         if(!user.getActivationStatus().equals( ActivationStatus.ESTABLISHED)) {
-            logger.warn("activateUser: user not in an activation state "+user.getActivationToken());
+            logger.warn("activateUser: user not in an activation state {}",user.getActivationToken());
             return BasicResponse.ACTIVATION_ALREADY_DONE_OR_NOT_POSSIBLE;
         }
         if(user.getActivationTokenExpiresAt().after( TimestampHelper.getNowAsUtcTimestamp())) {
             user.setActivationStatus(ActivationStatus.ACTIVE);
-            logger.error("activateUser: user activated "+user.getUuid());
+            logger.error("activateUser: user activated {}",user.getUuid());
             return BasicResponse.SUCCESS;
         }
         else {
-            logger.warn("activateUser: token expired "+user.getActivationToken());
+            logger.warn("activateUser: token expired {}",user.getActivationToken());
             return BasicResponse.ACTIVATION_TOKEN_EXPIRED;
         }
     }

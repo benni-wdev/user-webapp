@@ -14,25 +14,16 @@
  */
 package com.wwt.webapp.userwebapp.service.request;
 
+import lombok.*;
+
 @SuppressWarnings("unused")
+@Setter
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
 public class EmailChangeRequest implements InternalRequest {
 
 	private String email;
-
-    public EmailChangeRequest() {
-    }
-
-    public EmailChangeRequest(String email) {
-        this.email = email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getEmail() {
-        return email;
-    }
 
     @Override
     public final String toString() {

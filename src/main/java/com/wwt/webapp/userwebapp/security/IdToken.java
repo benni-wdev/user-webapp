@@ -16,6 +16,8 @@ package com.wwt.webapp.userwebapp.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,6 +30,8 @@ import java.util.UUID;
  *
  * @author benw-at-wwt
  */
+@Getter
+@ToString
 public class IdToken {
 
     private static final String adminRoleClaimType = "adminRole";
@@ -59,27 +63,6 @@ public class IdToken {
         this.adminRole = (adminRole == null?"":adminRole);
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public String getIssuer() {
-        return issuer;
-    }
-
-    public String getSubject() {
-        return subject;
-    }
-
-    public Instant getExpiresAt() {
-        return expiresAt;
-    }
-
-    public Instant getIssuedAt() {
-        return issuedAt;
-    }
-
-    public String getAdminRole() { return adminRole; }
 
     public String convertToSignedJwt() {
         Map<String,Object> claims = new HashMap<>();
@@ -96,17 +79,6 @@ public class IdToken {
                 .compact();
     }
 
-    @Override
-    public String toString() {
-        return "IdToken{" +
-                "id='" + id + '\'' +
-                ", issuer='" + issuer + '\'' +
-                ", subject='" + subject + '\'' +
-                ", expiresAt=" + expiresAt +
-                ", issuedAt=" + issuedAt +
-                ", adminRole=" + adminRole +
-                '}';
-    }
 
     public static IdToken newInstance(String issuer,String subject, int secondsValid, String adminRole) {
         return (new IdToken(issuer,subject,secondsValid,adminRole));

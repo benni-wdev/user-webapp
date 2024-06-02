@@ -14,12 +14,15 @@
  */
 package com.wwt.webapp.userwebapp.security;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 /**
  * @author benw-at-wwt
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class HashAlgorithmFactory {
 
-    private HashAlgorithmFactory() {}
 
     public static HashAlgorithm getInstance() {
         return BCryptHashAlgorithm.getInstance();

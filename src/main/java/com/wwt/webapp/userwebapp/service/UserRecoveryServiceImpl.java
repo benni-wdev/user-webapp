@@ -50,8 +50,8 @@ public class UserRecoveryServiceImpl extends BaseUserService implements UserReco
     @Transactional
     public InternalResponse initiateRecovery(String email) {
         Optional<UserEntity> userOpt = userRepository.getOperationalUsersByEmailAddress(email);
-        if(!userOpt.isPresent()) {
-            logger.error("initiateRecovery: Not exactly one user found: "+email);
+        if(userOpt.isEmpty()) {
+            logger.error("initiateRecovery: Not exactly one user found: {}",email);
             // We have to give success to prevent data mining
             return BasicResponse.SUCCESS;
         }
@@ -59,9 +59,9 @@ public class UserRecoveryServiceImpl extends BaseUserService implements UserReco
         user.setActivationStatus( ActivationStatus.SUSPENDED);
         UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
         user.setPasswordRecoveryToken(userStatusChangeToken.getToken(),userStatusChangeToken.getTokenExpiresAt());
-        logger.info( "password recovery token :"+userStatusChangeToken.getToken() );
+        logger.info( "password recovery token : {}",userStatusChangeToken.getToken() );
         mailProcessor.sendEmail( EmailType.PASSWORD_RECOVERY_MAIL,user.getEmailAddress(),user.getLoginId(),userStatusChangeToken.getToken());
-        logger.error("initiateRecovery: user locked, mail triggered" + user.getUuid());
+        logger.error("initiateRecovery: user locked, mail triggered {}",user.getUuid());
         userRepository.save(user);
         return BasicResponse.SUCCESS;
     }
@@ -70,25 +70,25 @@ public class UserRecoveryServiceImpl extends BaseUserService implements UserReco
     @Transactional
     public InternalResponse recoverUser(String passwordToken, String newPassword) {
         Optional<UserEntity> userOpt = userRepository.getUserByPasswordRecoveryToken(passwordToken);
-        if(!userOpt.isPresent()) {
-            logger.error("executeRecovery: Not exactly one user found: "+ passwordToken);
+        if(userOpt.isEmpty()) {
+            logger.error("executeRecovery: Not exactly one user found: {}",passwordToken);
             return new BasicResponse(false, MessageCode.PASSWORD_TOKEN_NOT_KNOWN);
         }
         UserEntity user = userOpt.get();
         if(!user.getActivationStatus().equals(ActivationStatus.SUSPENDED)) {
-            logger.warn("executeRecovery: user not in an activation state "+user.getPasswordRecoveryToken());
+            logger.warn("executeRecovery: user not in an activation state {}",user.getPasswordRecoveryToken());
             return new BasicResponse(false,MessageCode.RECOVERY_ALREADY_DONE_OR_NOT_POSSIBLE);
         }
         if(user.getPasswordRecoveryTokenExpiresAt().after( TimestampHelper.getNowAsUtcTimestamp())) {
             user.setActivationStatus(ActivationStatus.ACTIVE);
             PasswordHash passwordHash = PasswordHash.newInstance(newPassword);
             user.setPasswordHash(passwordHash.getPasswordHash());
-            logger.error("executeRecovery: user recovered "+user.getUuid());
+            logger.error("executeRecovery: user recovered {}",user.getUuid());
             userRepository.save(user);
             return BasicResponse.SUCCESS;
         }
         else {
-            logger.warn("executeRecovery: token expired "+user.getPasswordRecoveryToken());
+            logger.warn("executeRecovery: token expired {}",user.getPasswordRecoveryToken());
             return new BasicResponse(false,MessageCode.PASSWORD_RECOVERY_TOKEN_EXPIRED);
         }
     }

@@ -10,7 +10,8 @@
 </ul>
 
 <h2> Changes </h2>
- <ul>
+ <ul>   
+        <li>May 2024: Upgrade to Java 17, Spring Boot 3.25 and introducing Lombok</li>
         <li>March 2023: Added/Edited some files to run it with docker</li>
 </ul>
 
@@ -25,7 +26,7 @@
     </ul>
 <h2> Backend (Java) is build with </h2>
      <ul>
-        <li>Java 8</li>
+        <li>Java 17</li>
         <li>Spring Boot</li>
         <li>Spring Data JPA</li>
         <li>Spring Mail</li>

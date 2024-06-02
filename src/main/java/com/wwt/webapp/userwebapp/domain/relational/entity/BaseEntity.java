@@ -17,9 +17,12 @@ package com.wwt.webapp.userwebapp.domain.relational.entity;
 import com.wwt.webapp.userwebapp.domain.ObjectWithUuid;
 import com.wwt.webapp.userwebapp.helper.TimestampHelper;
 
-import javax.persistence.Column;
-import javax.persistence.Id;
-import javax.persistence.MappedSuperclass;
+import jakarta.persistence.Column;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
+import lombok.Getter;
+import lombok.ToString;
+
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +34,8 @@ import java.util.UUID;
  */
 @SuppressWarnings({"unused", "FieldMayBeFinal", "CanBeFinal"})
 @MappedSuperclass
+@Getter
+@ToString
 public class BaseEntity implements ObjectWithUuid {
 
     @Id
@@ -54,39 +59,11 @@ public class BaseEntity implements ObjectWithUuid {
     }
 
 
-    public String getUuid() {
-        return uuid;
-    }
-
-    public Timestamp getCreatedAt() {
-        return createdAt;
-    }
-
-    public int getVersion() {
-        return version;
-    }
-
-    public void setVersion(int version) {
-        this.version = version;
-    }
-
-    public Timestamp getLastModifiedAt() { return lastModifiedAt; }
-
-    public void setLastModifiedAt(Timestamp lastModifiedAt) { this.lastModifiedAt = lastModifiedAt; }
-
     void updateBase() {
         version++;
         lastModifiedAt = TimestampHelper.getNowAsUtcTimestamp();
     }
 
-    @Override
-    public String toString() {
-        return "uuid='" + uuid + '\'' +
-                ", createdAt=" + createdAt +
-                ", version=" + version +
-                ", lastModifiedAt=" + lastModifiedAt
-                ;
-    }
 
     public static <E extends BaseEntity> List<String> keyList(List<E> list) {
         if(list == null) throw new IllegalArgumentException("list must not be null");

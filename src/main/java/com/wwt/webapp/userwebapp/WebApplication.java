@@ -31,6 +31,8 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+import java.util.Objects;
+
 
 @SpringBootApplication
 @EnableAutoConfiguration
@@ -69,7 +71,7 @@ public class WebApplication {
         connector.setScheme("http");
         connector.setPort( ConfigProvider.getConfigIntValue("httpPort"));
         connector.setSecure(false);
-        connector.setRedirectPort(Integer.parseInt(environment.getProperty("server.port")));
+        connector.setRedirectPort(Integer.parseInt(Objects.requireNonNull(environment.getProperty("server.port"))));
         return connector;
     }
 

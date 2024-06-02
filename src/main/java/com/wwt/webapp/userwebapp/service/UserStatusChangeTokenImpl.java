@@ -16,6 +16,9 @@ package com.wwt.webapp.userwebapp.service;
 
 import com.wwt.webapp.userwebapp.helper.ConfigProvider;
 import com.wwt.webapp.userwebapp.helper.TimestampHelper;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.commons.codec.binary.Hex;
 
 import java.security.SecureRandom;
@@ -24,26 +27,13 @@ import java.sql.Timestamp;
 /**
  * @author benw-at-wwt
  */
+@Getter
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class UserStatusChangeTokenImpl implements UserStatusChangeToken {
 
 
     private final String token;
     private final Timestamp tokenExpiresAt;
-
-    private UserStatusChangeTokenImpl(String token, Timestamp tokenExpiresAt) {
-        this.token = token;
-        this.tokenExpiresAt = tokenExpiresAt;
-    }
-
-    @Override
-    public String getToken() {
-        return token;
-    }
-
-    @Override
-    public Timestamp getTokenExpiresAt() {
-        return tokenExpiresAt;
-    }
 
     public static UserStatusChangeTokenImpl newInstance() {
         SecureRandom random = new SecureRandom();

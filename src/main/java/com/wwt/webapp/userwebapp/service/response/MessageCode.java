@@ -15,9 +15,14 @@
 package com.wwt.webapp.userwebapp.service.response;
 
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 /**
  * @author benw-at-wwt
  */
+@Getter
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 public enum MessageCode {
 
     /*Registration */
@@ -51,14 +56,6 @@ public enum MessageCode {
     INPUT_NOT_VALID("Input not valid")                                                           //400
     ;
     private final String message;
-
-    MessageCode(String s) {
-        message = s;
-    }
-
-    public String getMessage() {
-        return message;
-    }
 
     @Override
     public String toString() {

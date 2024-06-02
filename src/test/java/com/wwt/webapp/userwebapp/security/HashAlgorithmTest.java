@@ -24,7 +24,7 @@ public class HashAlgorithmTest {
 
     @Test
     public void testCheckPassword() {
-        @SuppressWarnings("SpellCheckingInspection") HashAlgorithm algo = BCryptHashAlgorithm.getInstance();
+        HashAlgorithm algo = BCryptHashAlgorithm.getInstance();
         assertTrue(algo.isPasswordEquals ("test1",
                 algo.hashPassword("test1")
         ));

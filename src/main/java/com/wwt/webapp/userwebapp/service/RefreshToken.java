@@ -14,20 +14,19 @@
  */
 package com.wwt.webapp.userwebapp.service;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.commons.codec.binary.Hex;
 
 import java.security.SecureRandom;
 
 @SuppressWarnings("ALL")
+@Getter
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class RefreshToken {
 
-    private static RefreshToken nullInstance;
-
     private final String token;
-
-    private RefreshToken(String token) {
-        this.token = token;
-    }
 
     @Override
     public String toString() {
@@ -45,10 +44,4 @@ public class RefreshToken {
         return new RefreshToken(token);
     }
 
-    public static RefreshToken getNullInstance() {
-        if(nullInstance == null) {
-            nullInstance = new RefreshToken("");
-        }
-        return nullInstance;
-    }
 }

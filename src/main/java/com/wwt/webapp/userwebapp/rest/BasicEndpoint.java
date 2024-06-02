@@ -33,8 +33,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.core.Response;
 import java.util.Calendar;
@@ -100,17 +100,16 @@ public abstract class BasicEndpoint {
     protected void evaluateAccessRisk(Logger logger, HttpServletRequest httpRequest, InternalRequest internalRequest) {
         //Here we can evaluate risk based on known IP addresses (or everything what can be derived from it),
         // and for example force step up but needs additional infrastructure
-        logger.info("Request received:"+internalRequest.toString());
-        logger.error( "ACCESS->" + httpRequest.getRemoteAddr() + " " + internalRequest);
+        logger.info("Request received: {}",internalRequest.toString());
+        logger.error( "ACCESS-> {} {}",httpRequest.getRemoteAddr(),internalRequest);
     }
 
     protected boolean isAuthParametersOk(Cookie cookie) {
-        if(cookie == null || cookie.getValue().equals("")) {
-            logger.info( "cookie not shaped well:"+cookie );
+        if(cookie == null || cookie.getValue().isEmpty()) {
+            logger.info( "cookie not shaped well: {}",cookie );
             return false;
         }
         else {
-            // logger.info( "cookie shaped well:" + cookie );
             return true;
         }
     }
@@ -138,10 +137,10 @@ public abstract class BasicEndpoint {
                     return false;
                 }
             } catch (ExpiredJwtException e1) {
-                logger.info("Token expired "+idToken);
+                logger.info("Token expired {}",idToken);
                 return false;
             } catch (SignatureException | MalformedJwtException | IllegalArgumentException e2) {
-                logger.error("Token invalid!!! "+idToken);
+                logger.error("Token invalid!!! {}",idToken);
                 return false;
             }
         }
@@ -158,7 +157,7 @@ public abstract class BasicEndpoint {
             logger.error( "Admin Role Conversion",e );
             userRole = AdminRole.NO_ROLE;
         }
-        logger.info( "user has role " + userRole + " required is " + requiredRole );
+        logger.info( "user has role {}, required is {}",userRole,requiredRole );
         if (requiredRole.equals( userRole )) return true;
         if (requiredRole.equals( AdminRole.NO_ROLE )) return true;
         return userRole.equals( AdminRole.FULL_ADMIN );

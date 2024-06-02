@@ -15,10 +15,16 @@
 package com.wwt.webapp.userwebapp.service.response;
 
 import com.wwt.webapp.userwebapp.domain.relational.entity.UserEntity;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
+@Setter
+@ToString
 public class UserResponseList  extends BasicSuccessResponse {
 
     private List<UserResponseItem> users;
@@ -28,18 +34,9 @@ public class UserResponseList  extends BasicSuccessResponse {
         users = new ArrayList<>();
     }
 
-    public List<UserResponseItem> getUsers() {
-        return users;
-    }
-
-    public void setUsers(List<UserResponseItem> users) {
-        this.users = users;
-    }
-
     private void addUser(UserResponseItem user) {
         users.add(user);
     }
-
 
     public static UserResponseList convertToUserResponseList(List<UserEntity> users) {
         UserResponseList l = new UserResponseList();

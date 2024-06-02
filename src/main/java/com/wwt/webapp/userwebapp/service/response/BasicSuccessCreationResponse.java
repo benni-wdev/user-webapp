@@ -14,18 +14,16 @@
  */
 package com.wwt.webapp.userwebapp.service.response;
 
+import lombok.*;
+
 /**
  * @author benw-at-wwt
  */
+@Getter
+@AllArgsConstructor
+@ToString
 public class BasicSuccessCreationResponse extends BasicSuccessResponse {
 
     private final String uuid;
 
-    public BasicSuccessCreationResponse(String uuid) {
-        this.uuid = uuid;
-    }
-
-    public String getUuid() {
-        return uuid;
-    }
 }

@@ -270,8 +270,8 @@ public class AuthenticationServiceImplTest extends BaseServiceTest {
         String token = ((AuthenticationSuccessResponse)internalResponse).getToken();
         String refreshToken = ((AuthenticationSuccessResponse)internalResponse).getRefreshToken();
         IdToken idToken = IdToken.parse(token);
-        Instant compare1 = Instant.now().plusSeconds(getConfigIntValue("ttl")*2);
-        Instant compare2 = Instant.now().plusSeconds(getConfigIntValue("ttlLong")*2);
+        Instant compare1 = Instant.now().plusSeconds(getConfigIntValue("ttl")*2L);
+        Instant compare2 = Instant.now().plusSeconds(getConfigIntValue("ttlLong")*2L);
         assertTrue(idToken.getExpiresAt().isAfter(compare1)
                 && idToken.getExpiresAt().isBefore(compare2));
         Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId1);
@@ -295,7 +295,7 @@ public class AuthenticationServiceImplTest extends BaseServiceTest {
         Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId10);
         assertTrue(userOpt.isPresent());
         UserEntity u = userOpt.get();
-        assertEquals("",u.getRefreshToken());
+        assertNull(u.getRefreshToken());
         assertTrue( r2.isSuccessful() );
         assertEquals( MessageCode.OPERATION_SUCCESSFUL,r2.getMessageCode() );
     }

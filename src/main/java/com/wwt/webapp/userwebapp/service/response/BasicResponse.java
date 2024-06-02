@@ -14,9 +14,16 @@
  */
 package com.wwt.webapp.userwebapp.service.response;
 
+import lombok.*;
+
 /**
  * @author benw-at-wwt
  */
+@Setter
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
 public class BasicResponse implements InternalResponse {
 
     public static final BasicResponse SESSION_INVALID                         = new BasicResponse(false, MessageCode.SESSION_INVALID);
@@ -36,45 +43,16 @@ public class BasicResponse implements InternalResponse {
     public static final BasicResponse FORBIDDEN                               = new BasicResponse(false, MessageCode.FORBIDDEN);
     public static final BasicResponse ITEM_NOT_KNOWN                          = new BasicResponse(false, MessageCode.ITEM_NOT_KNOWN);
     public static final BasicResponse UNEXPECTED_ERROR                        = new BasicResponse(false, MessageCode.UNEXPECTED_ERROR);
+
+
+
     private boolean isSuccessful;
     private MessageCode messageCode;
 
-    public BasicResponse() {
-    }
-
-    public BasicResponse(boolean isSuccessful, MessageCode messageCode) {
-        this.isSuccessful = isSuccessful;
-        this.messageCode = messageCode;
-    }
-
-    @Override
-    public boolean isSuccessful() {
-        return isSuccessful;
-    }
 
     @Override
     public String getMessageText() {
         return messageCode.getMessage();
     }
 
-    @Override
-    public MessageCode getMessageCode() {
-        return messageCode;
-    }
-
-    public void setSuccessful(boolean successful) {
-        isSuccessful = successful;
-    }
-
-    public void setMessageCode(MessageCode messageCode) {
-        this.messageCode = messageCode;
-    }
-
-    @Override
-    public String toString() {
-        return "BasicResponse{" +
-                "isSuccessful=" + isSuccessful +
-                ", messageCode=" + messageCode +
-                '}';
-    }
 }

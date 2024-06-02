@@ -54,19 +54,19 @@ public class RegisterUserServiceImpl extends BaseUserService implements Register
     @Transactional
     public InternalResponse registerUser(final RegistrationRequest registrationRequest) {
         if(!isValidEmailAddress(registrationRequest.getEmailAddress())) {
-            logger.debug("registerUser: email address not valid "+registrationRequest.getEmailAddress());
+            logger.debug("registerUser: email address not valid {}",registrationRequest.getEmailAddress());
             return BasicResponse.EMAIL_ADDRESS_NOT_VALID;
         }
         if(!isValidLoginId(registrationRequest.getLoginId())) {
-            logger.debug("registerUser: loginId not valid "+registrationRequest.getLoginId());
+            logger.debug("registerUser: loginId not valid {}",registrationRequest.getLoginId());
             return BasicResponse.LOGIN_ID_NOT_VALID;
         }
         if(!isEmailUnique(registrationRequest.getEmailAddress(),userRepository)) {
-            logger.debug("registerUser: email address already used "+registrationRequest.getEmailAddress());
+            logger.debug("registerUser: email address already used {}",registrationRequest.getEmailAddress());
             return BasicResponse.EMAIL_ADDRESS_ALREADY_EXISTS;
         }
         if(!isLoginIdUnique(registrationRequest.getLoginId(),userRepository)) {
-            logger.debug("registerUser: login id already used "+registrationRequest.getLoginId());
+            logger.debug("registerUser: login id already used {}",registrationRequest.getLoginId());
             return BasicResponse.LOGIN_ID_ALREADY_EXISTS;
         }
         else {
@@ -74,13 +74,13 @@ public class RegisterUserServiceImpl extends BaseUserService implements Register
             UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
             UserEntity user = new UserEntity(registrationRequest.getLoginId(),
                     registrationRequest.getEmailAddress(), passwordHash.getPasswordHash(), userStatusChangeToken.getToken(),userStatusChangeToken.getTokenExpiresAt());
-            logger.info("User activation token "+userStatusChangeToken.getToken() );
+            logger.info("User activation token {}",userStatusChangeToken.getToken() );
             if(ConfigProvider.getConfigBoolean("isUserActiveOnRegistration")) {
                 user.setActivationStatus( ActivationStatus.ACTIVE);
             }
             userRepository.save(user);
             mailProcessor.sendEmail( EmailType.ACTIVATION_MAIL,user.getEmailAddress(),user.getLoginId(),userStatusChangeToken.getToken());
-            logger.error("registerUser: Registered new UserResponse "+user.getUuid());
+            logger.error("registerUser: Registered new UserResponse {}",user.getUuid());
             return new RegistrationSuccessResp(user.getEmailAddress());
         }
     }
@@ -88,7 +88,7 @@ public class RegisterUserServiceImpl extends BaseUserService implements Register
 
     private boolean isLoginIdUnique(String loginId, UserRepository userRepository) {
         Optional<UserEntity> userOpt = userRepository.getUserByLoginId(loginId);
-        return !userOpt.isPresent();
+        return userOpt.isEmpty();
     }
 
 }

@@ -70,8 +70,8 @@ public class UserServiceImpl extends BaseUserService implements UserService {
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         Optional<UserEntity> userOpt = userRepository.findById(userUuid);
-        if(!userOpt.isPresent()) {
-            logger.warn("readUser: Not exactly one user found: " + userUuid);
+        if(userOpt.isEmpty()) {
+            logger.warn("readUser: Not exactly one user found: {}",userUuid);
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         UserEntity user = userOpt.get();
@@ -83,15 +83,15 @@ public class UserServiceImpl extends BaseUserService implements UserService {
     @Transactional
     public InternalResponse changePassword(String userUuid, String oldPassword, String newPassword) {
         Optional<UserEntity> userOpt = userRepository.findById(userUuid);
-        if(!userOpt.isPresent()) {
-            logger.warn("changePassword: Not exactly one user found: " + userUuid);
+        if(userOpt.isEmpty()) {
+            logger.warn("changePassword: Not exactly one user found: {}",userUuid);
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         UserEntity user = userOpt.get();
         if (PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(oldPassword)) {
             user.setPasswordHash(PasswordHash.newInstance(newPassword).getPasswordHash());
             userRepository.save(user);
-            logger.error("changePassword: Password changed" + user.getUuid());
+            logger.error("changePassword: Password changed {}",user.getUuid());
             return BasicResponse.SUCCESS;
         }
         else {
@@ -104,31 +104,31 @@ public class UserServiceImpl extends BaseUserService implements UserService {
     @Transactional
     public InternalResponse changeEmail(String userUuid, String newEmailAddress) {
         Optional<UserEntity> userOpt = userRepository.findById(userUuid);
-        if(!userOpt.isPresent()) {
-            logger.warn("changeEmail: Not exactly one user found: " +userUuid);
+        if(userOpt.isEmpty()) {
+            logger.warn("changeEmail: Not exactly one user found: {}",userUuid);
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         UserEntity user = userOpt.get();
         if (!isValidEmailAddress(newEmailAddress)) {
-            logger.info("changeEmail: email not valid " + newEmailAddress);
+            logger.info("changeEmail: email not valid {}",newEmailAddress);
             return BasicResponse.EMAIL_ADDRESS_NOT_VALID;
         }
         if (user.getEmailAddress().equals(newEmailAddress)) {
-            logger.debug("changeEmail: email address not changed " + newEmailAddress);
+            logger.debug("changeEmail: email address not changed {}",newEmailAddress);
             return BasicResponse.NO_CHANGE_NO_UPDATE;
         }
         if (!isEmailUnique(newEmailAddress,userRepository)) {
-            logger.warn("changeEmail: email address already used " + newEmailAddress);
+            logger.warn("changeEmail: email address already used {}",newEmailAddress);
             return BasicResponse.EMAIL_ADDRESS_ALREADY_EXISTS;
         }
         user.setEmailAddress(newEmailAddress);
         user.setActivationStatus( ActivationStatus.ESTABLISHED);
         //for changing the email re-activation in necessary
         UserStatusChangeToken userStatusChangeToken = UserStatusChangeTokenImpl.newInstance();
-        logger.info("Email change Token:"+userStatusChangeToken.getToken());
+        logger.info("Email change Token: {}",userStatusChangeToken.getToken());
         user.setActivationToken(userStatusChangeToken.getToken(),userStatusChangeToken.getTokenExpiresAt());
         mailProcessor.sendEmail( EmailType.ACTIVATION_MAIL, user.getEmailAddress(),user.getLoginId(), userStatusChangeToken.getToken());
-        logger.error("changeEmail: email changed" + user.getUuid());
+        logger.error("changeEmail: email changed {}",user.getUuid());
         userRepository.save(user);
         return BasicResponse.SUCCESS;
     }
@@ -138,20 +138,20 @@ public class UserServiceImpl extends BaseUserService implements UserService {
     @Transactional
     public InternalResponse archiveUser(String userUuid, String password) {
         Optional<UserEntity> userOpt = userRepository.findById(userUuid);
-        if(!userOpt.isPresent()) {
-            logger.warn("archiveUser: Not exactly one user found: " + userUuid);
+        if(userOpt.isEmpty()) {
+            logger.warn("archiveUser: Not exactly one user found: {}",userUuid);
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         UserEntity user = userOpt.get();
         if (!user.getActivationStatus().equals(ActivationStatus.ACTIVE)) {
-            logger.warn("archiveUser: user not active " + user.getUuid());
+            logger.warn("archiveUser: user not active {}",user.getUuid());
             return BasicResponse.USER_NOT_ACTIVE;
         }
         if (!PasswordHash.getInstance(user.getPasswordHash()).isPasswordHashEquals(password)) {
-            logger.warn("archiveUser: user password check failed  " + user.getUuid());
+            logger.warn("archiveUser: user password check failed {}",user.getUuid());
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
-        logger.error("archiveUser: user archived " + user.getUuid());
+        logger.error("archiveUser: user archived {}",user.getUuid());
         user.setActivationStatus(ActivationStatus.ARCHIVED);
         return BasicResponse.SUCCESS;
     }
@@ -160,8 +160,8 @@ public class UserServiceImpl extends BaseUserService implements UserService {
     @Transactional
     public InternalResponse updateUser(String userUuid, String email, AdminRole adminRole, ActivationStatus activationStatus) {
         Optional<UserEntity> userOpt = userRepository.findById(userUuid);
-        if(!userOpt.isPresent()) {
-            logger.warn("updateUser: Not exactly one user found: " + userUuid);
+        if(userOpt.isEmpty()) {
+            logger.warn("updateUser: Not exactly one user found: {}",userUuid);
             return BasicResponse.LOGIN_OR_PASSWORD_WRONG;
         }
         UserEntity user = userOpt.get();
@@ -169,16 +169,16 @@ public class UserServiceImpl extends BaseUserService implements UserService {
             user.getAdminRole().equals(adminRole) &&
             user.getEmailAddress().equals(email)
         ) {
-            logger.warn("updateUser: no change " + user.getUuid());
+            logger.warn("updateUser: no change {}",user.getUuid());
             return BasicResponse.NO_CHANGE_NO_UPDATE;
         }
         if(!user.getEmailAddress().equals(email)) {
             if (!isValidEmailAddress(email)) {
-                logger.info("updateUser: email not valid " + email);
+                logger.info("updateUser: email not valid {}",email);
                 return BasicResponse.EMAIL_ADDRESS_NOT_VALID;
             }
             else if (!isEmailUnique(email,userRepository)) {
-                logger.warn("updateUser: email address already used " + email);
+                logger.warn("updateUser: email address already used {}",email);
                 return BasicResponse.EMAIL_ADDRESS_ALREADY_EXISTS;
             }
             else {
@@ -187,7 +187,7 @@ public class UserServiceImpl extends BaseUserService implements UserService {
         }
         if(!user.getActivationStatus().equals(activationStatus)) user.setActivationStatus(activationStatus);
         if(!user.getAdminRole().equals(adminRole)) user.setAdminRole(adminRole);
-        logger.error("updateUser: user updated " + user.getUuid());
+        logger.error("updateUser: user updated {}",user.getUuid());
         return BasicResponse.SUCCESS;
     }
 }
